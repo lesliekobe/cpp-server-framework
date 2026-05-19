@@ -1,98 +1,107 @@
 # C++ Industrial Server Framework
 
-**C++ 工业级服务端框架** — 跨平台（Linux/Windows），可直接落地用于网关、服务端、工控后台、嵌入式后台。
+A production-ready C++ server framework for industrial control, gateway services, and backend systems.
 
-集成：TCP/IP 网络通信 + 多线程 + 线程池 + 并发任务调度 + 事件驱动 + 内存池
+## Features
 
----
+- **跨平台**: Linux (epoll) / Windows (IOCP) 支持
+- **高性能**: 基于 epoll/IOCP 的事件驱动架构，无锁 CAS 对象池
+- **模块化设计**: 每个模块独立，可单独使用
+- **线程安全**: 完整的线程池 + 无锁数据结构
+- **开箱即用**: 可直接作为网关 / 工业控制服务器 / 后端服务框架
 
-## 架构分层
+## 模块列表
 
-```
-┌─────────────────────────────────────┐
-│  应用业务层                          │
-│  业务协议解析 | 会话管理 | 消息路由    │
-├─────────────────────────────────────┤
-│  网络通信层                          │
-│  TCP服务端/客户端 | 粘包分包 | 心跳    │
-├─────────────────────────────────────┤
-│  并发调度层                          │
-│  线程池 | 任务队列 | 异步任务          │
-├─────────────────────────────────────┤
-│  基础组件层                          │
-│  互斥锁 | 原子操作 | 内存池 | 日志    │
-├─────────────────────────────────────┤
-│  系统适配层                          │
-│  Linux/Windows 跨平台封装            │
-└─────────────────────────────────────┘
-```
+### 基础模块 (base/)
 
----
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| **Logger** | `base/logger/logger.h` | 六级日志 (TRACE/DEBUG/INFO/WARN/ERROR/FATAL)、异步落盘、按天切割、GZip压缩、颜色输出 |
+| **Time** | `base/time/timestamp.h` | 时间戳、高精度计时器 |
+| **Lock** | `base/lock/` | 互斥锁、条件变量、读写锁 |
+| **Memory** | `base/memory/memory_pool.h` | 固定大小内存池，多规格按需增长 |
+| **Event Loop** | `base/event/event_loop.h` | epoll/Kqueue/IOCP 封装，异步IO，TimerFd/SocketFd 事件监听 |
+| **Timer** | `base/timer/timer.h` | 高精度定时器（内存时间轮），一次性/周期任务，支持取消 |
+| **Message Queue** | `base/message_queue/message_queue.h` | 线程间消息队列，MPMC 模式，topic 订阅/广播 |
+| **Config** | `base/config/config.h` | JSON/INI 解析，命令行参数，热加载配置 |
+| **Object Pool** | `base/object_pool/object_pool.h` | 模板对象池，构造/析构回调，线程安全 |
+| **Signal Handler** | `base/process/signal_handler.h` | 信号捕获，优雅退出，shutdown 回调链 |
+
+### 核心模块 (core/)
+
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| **ThreadPool** | `core/threadpool/thread_pool.h` | 线程池，支持固定/动态线程数，任务队列 |
+| **Task** | `core/task/task.h` | 任务封装，支持 priority/cancel |
+| **Monitor** | `core/monitor/monitor.h` | 连接数、队列长度、线程负载、内存 RSS 统计，HTTP 监控页 |
+
+### 网络模块 (network/)
+
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| **TCP Server** | `network/tcp/tcp_server.h` | 多线程 TCP 服务器 |
+| **TCP Client** | `network/tcp/tcp_client.h` | TCP 客户端 |
+| **TCP Connection** | `network/tcp/tcp_connection.h` | 连接封装 |
+| **Protocol** | `network/protocol/packet.h` | 数据包封装 |
+| **Codec** | `network/codec/codec.h` | 二进制协议 (Length+Version+CRC32+Seq+Cmd+Data)，CRC校验，防重放，字节序转换，Protobuf 扩展点 |
+
+### 业务模块 (business/)
+
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| **Session Manager** | `business/session/session_mgr.h` | 会话上下文管理、超时清理、踢人、广播、单发 |
+| **Router** | `business/router/router.h` | 消息路由 |
+
+### 数据库模块 (db/)
+
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| **Connection Pool** | `db/connection_pool.h` | MySQL/SQLite 连接池，异步 SQL 执行 |
+| **Query Task** | `db/query_task.h` | SQL 任务丢线程池异步执行 |
+
+### 适配层 (adapter/)
+
+| 模块 | 文件 | 说明 |
+|------|------|------|
+| **Platform** | `adapter/platform.h` | 跨平台封装：线程、Socket、文件操作、时间、原子操作 |
 
 ## 目录结构
 
 ```
 cpp-server-framework/
-├── base/                    # 基础组件层
-│   ├── logger/              # 日志系统（分级+滚动）
-│   ├── time/                # 时间工具
-│   ├── lock/                # 互斥锁、条件变量
-│   └── memory/              # 内存池
-├── core/                    # 并发调度层
-│   ├── threadpool/          # 线程池
-│   └── task/                # 任务封装
-├── network/                 # 网络通信层
-│   ├── tcp/                 # TCP 服务端/客户端/连接
-│   └── protocol/            # 数据包协议
-├── business/                # 应用业务层
-│   ├── session/             # 会话管理
-│   └── router/              # 消息路由
-├── adapter/                 # 系统适配层
-├── example/                 # 使用示例
-│   ├── server/              # 服务端示例
-│   └── gateway/             # 网关示例
-├── test/                    # 单元测试
+├── adapter/           # 跨平台适配层
+│   ├── platform.h/cpp
+├── base/              # 基础模块
+│   ├── config/
+│   ├── event/
+│   ├── logger/
+│   ├── lock/
+│   ├── memory/
+│   ├── message_queue/
+│   ├── object_pool/
+│   ├── process/
+│   ├── time/
+│   └── timer/
+├── business/          # 业务层
+│   ├── router/
+│   └── session/
+├── core/              # 核心组件
+│   ├── monitor/
+│   ├── task/
+│   └── threadpool/
+├── db/                 # 数据库
+│   ├── connection_pool.h/cpp
+│   └── query_task.h
+├── network/            # 网络层
+│   ├── codec/
+│   ├── protocol/
+│   └── tcp/
+├── example/            # 示例
+│   ├── gateway/
+│   └── server/
+├── test/               # 单元测试
 └── CMakeLists.txt
 ```
-
----
-
-## 核心模块
-
-### 1. 基础工具模块
-
-| 模块 | 说明 |
-|------|------|
-| **logger** | 分级日志（DEBUG/INFO/WARN/ERROR），按大小滚动 |
-| **timestamp** | 时间戳获取、格式化、时区转换 |
-| **mutex** | Mutex 互斥锁封装（RAII 风格） |
-| **condition** | 条件变量封装 |
-| **memory_pool** | 固定大小内存池，减少 new/delete 碎片 |
-
-### 2. 线程池模块
-
-- 固定大小工作线程
-- 阻塞任务队列（无界/有界可选）
-- 支持 `std::function<void()>` 任意任务
-- 支持优雅停止（等队列清空）
-- 有锁/无锁双模式可选（默认有锁）
-
-### 3. 网络通信模块
-
-- **TcpServer**: Epoll（Linux）/ Select（Windows）事件驱动
-- **TcpClient**: 自动重连
-- **TcpConnection**: 每连接独立读写，线程安全
-- **Packet**: 自定义协议头（4字节长度 + 2字节命令 + 数据）
-- **拆包/防粘包**: 基于长度域的完整分包
-- **心跳检测**: 空闲超时断开
-
-### 4. 会话管理
-
-- 在线客户端列表
-- SessionID → Connection 映射
-- 消息广播、单点下发
-
----
 
 ## 快速开始
 
@@ -100,68 +109,146 @@ cpp-server-framework/
 
 ```bash
 mkdir build && cd build
-cmake .. && make -j4
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j4
 ```
 
 ### 运行示例
 
 ```bash
-# TCP 服务端
-./tcp_server_example 8080
+# TCP 服务器示例
+./tcp_server_example
 
 # 网关示例
-./gateway_example 8888
+./gateway_example
 ```
 
-### 编写业务
+## 使用示例
+
+### Logger (六极日志 + 异步)
 
 ```cpp
-#include "network/tcp/tcp_server.h"
-#include "core/threadpool/thread_pool.h"
-#include "base/logger/logger.h"
+#include "logger/logger.h"
 
-int main() {
-    // 初始化日志
-    Logger::instance()->init("server.log", LogLevel::INFO);
+// 初始化（异步写盘，按天切割，GZip压缩）
+framework::Logger::instance()->init("./logs", "server",
+    framework::LogLevel::INFO,  // Console 级别
+    framework::LogLevel::DEBUG  // File 级别
+);
 
-    // 创建线程池
-    ThreadPool pool(4);
+// 使用
+LOG_INFO("Server started on port %d", 8080);
+LOG_ERROR("Connection failed: %s", strerror(errno));
+```
 
-    // 启动 TCP 服务端
-    TcpServer server(8080);
-    server.set_message_handler([&pool](int64_t session_id, const std::string& data) {
-        // 业务逻辑投递到线程池异步执行
-        pool.append([session_id, data]() {
-            LOG_INFO("处理会话 %d, 数据长度: %zu", session_id, data.size());
-            // ... 业务处理
-        });
-    });
-    server.start();
+### EventLoop (事件驱动)
 
-    std::this_thread::sleep_for(std::chrono::seconds(3600));
-    return 0;
+```cpp
+#include "base/event/event_loop.h"
+
+auto loop = framework::create_event_loop();
+// 注册 socket 事件
+loop->add_fd(sockfd, framework::EventType::READ, &handler);
+
+// 添加定时器
+loop->add_timer(5000, [](){ LOG_INFO("5s timer fired"); }, 5000); // 周期
+
+loop->run();
+```
+
+### Session Manager (会话管理)
+
+```cpp
+#include "session/session_mgr.h"
+using namespace framework;
+
+SessionMgr* mgr = global_session_mgr();
+mgr->init();
+
+// 新连接
+int64_t sid = mgr->add(socket_fd, "192.168.1.100", 12345);
+
+// 广播消息
+mgr->broadcast(data, [](int64_t sid, const uint8_t* d, size_t len) {
+    send_to_sid(sid, d, len);
+});
+
+// 踢人
+mgr->kick(sid);
+
+// 清理超时连接（每30秒调用）
+mgr->cleanup_timeout(get_tick_ms(), 30000);
+```
+
+### Config (配置解析)
+
+```cpp
+#include "config/config.h"
+
+Config cfg;
+cfg.load_json("config.json");
+cfg.load_ini("server.ini");
+
+// 按路径获取
+int port = cfg.get("server.port")->as_int();
+std::string host = cfg.get("server.host")->as_string();
+
+// 命令行参数
+CmdLineParser parser;
+parser.add("port", 'p', true, "server port", "8080");
+parser.add("config", 'c', true, "config file");
+parser.parse(argc, argv);
+
+int p = std::stoi(parser.get("port"));
+```
+
+### Codec (协议编解码)
+
+```cpp
+#include "codec/codec.h"
+
+Codec codec;
+// 注册命令处理器
+codec.register_handler(0x1001, [](uint32_t seq, const uint8_t* d, size_t len) {
+    LOG_DEBUG("cmd=0x1001 seq=%u len=%zu", seq, len);
+});
+
+// 编码
+auto pkt = codec.encode(0x1001, payload.data(), payload.size(), seq++);
+
+// 解码（流式）
+auto result = codec.decode(buf, buf_len);
+if (result) {
+    handle(result->cmd, result->seq, result->data);
 }
 ```
 
----
+### Connection Pool (数据库连接池)
 
-## 数据包协议
+```cpp
+#include "db/connection_pool.h"
 
+ConnectionPool db;
+db.init_sqlite("./data.db", 4);
+db.set_thread_pool(thread_pool);
+
+db.execute_sql_async("INSERT INTO logs VALUES(...)", [](const DBResult& r) {
+    if (r.success) LOG_DEBUG("insert ok");
+    else LOG_ERROR("insert failed: %s", r.error_msg.c_str());
+});
 ```
-+-------------+-----------+-------------+
-| Length(4B)  | Cmd(2B)   | Data(N B)   |
-+-------------+-----------+-------------+
+
+## 测试
+
+```bash
+cd build
+ctest --output-on-failure
+# 或
+./threadpool_test
+./logger_test
+./tcp_test
 ```
 
-- `Length`: 整个包字节数（包含头部，4字节大端序）
-- `Cmd`: 命令字（2字节）
-- `Data`: 业务数据
+## License
 
----
-
-## 依赖
-
-- C++17 编译器
-- CMake 3.20+
-- Linux: glibc / macOS: libpthread
-- Windows: WinSock2（已封装，跨平台透明）
+MIT
